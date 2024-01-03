@@ -1,5 +1,6 @@
 package study.querydsl;
 
+import com.querydsl.core.QueryResults;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import jakarta.persistence.EntityManager;
 import org.assertj.core.api.Assertions;
@@ -62,9 +63,12 @@ public class QuerydslBasicTest {
     @Test
     public void startQuerydsl() {
         /**
-         * [설명]
+         * [기본 Q-Type 활용]
          * 별칭 직접 지정 방식 vs 기본 인스턴스 사용 방식
          * -> 기본 인스턴스 사용 방식(import static) 권장
+         * [예시]
+         * QMember qMember = new QMember("m"); //별칭 직접 지정
+         * QMember qMember = QMember.member; //기본 인스턴스 사용
          */
         Member findMember = queryFactory
                 .select(member)
@@ -98,5 +102,68 @@ public class QuerydslBasicTest {
                 .fetchOne();
 
         assertThat(findMember.getUsername()).isEqualTo("member1");
+    }
+
+    /**
+     * [결과 조회]
+     * fetch(): 리스트 조회, 데이터 없으면 빈 리스트 반환
+     * fetchOne() : 단 건 조회
+     * fetchFirst() : limit(1).fetchOne()
+     * fetchResults() : 페이징 정보 포함, total count 쿼리 추가 실행
+     * fetchCount() : count 쿼리로 변경해서 count 수 조회
+     */
+    @Test
+    public void resultFetch() {
+        //List
+//        List<Member> fetch = queryFactory
+//                .selectFrom(member)
+//                .fetch();
+        //단 건
+//        Member findMember1 = queryFactory
+//                .selectFrom(member)
+//                .fetchOne();
+        //처음 한 건 조회
+//        Member findMember2 = queryFactory
+//                .selectFrom(member)
+//                .fetchFirst();
+        //페이징에서 사용
+//        QueryResults<Member> results = queryFactory
+//                .selectFrom(member)
+//                .fetchResults();
+        //count 쿼리로 변경
+        long count = queryFactory
+                .selectFrom(member)
+                .fetchCount();
+
+//        results.getTotal();
+//        List<Member> content = results.getResults();
+    }
+
+    /**
+     * 회원 정렬 순서
+     * 1. 회원 나이 내림차순(desc)
+     * 2. 회원 이름 오름차순(asc)
+     * 단, 2에서 회원 이름이 없으면 마지막에 출력(nulls last)
+     *
+     */
+    @Test
+    public void sort() {
+        em.persist(new Member(null, 100));
+        em.persist(new Member("member5", 100));
+        em.persist(new Member("member6", 100));
+
+        List<Member> result = queryFactory
+                .selectFrom(member)
+                .where(member.age.eq(100))
+                .orderBy(member.age.desc(), member.username.asc().nullsLast())
+                .fetch();
+
+        Member member5 = result.get(0);
+        Member member6 = result.get(1);
+        Member memberNull = result.get(2);
+
+        assertThat(member5.getUsername()).isEqualTo("member5");
+        assertThat(member6.getUsername()).isEqualTo("member6");
+        assertThat(memberNull.getUsername()).isNull();
     }
 }
