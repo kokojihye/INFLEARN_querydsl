@@ -1,6 +1,7 @@
 package study.querydsl;
 
 import com.querydsl.core.QueryResults;
+import com.querydsl.core.Tuple;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import jakarta.persistence.EntityManager;
 import org.assertj.core.api.Assertions;
@@ -11,12 +12,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 import study.querydsl.entity.Member;
 import study.querydsl.entity.QMember;
+import study.querydsl.entity.QTeam;
 import study.querydsl.entity.Team;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
 import static study.querydsl.entity.QMember.member;
+import static study.querydsl.entity.QTeam.*;
 
 @SpringBootTest
 @Transactional
@@ -48,6 +51,10 @@ public class QuerydslBasicTest {
         em.persist(member4);
     }
 
+    /**
+     * [Lesson01.JPQL vs Querydsl 비교]
+     * JPQL 사용예시
+     */
     @Test
     public void startJPQL() {
         //member1을 ckwdkfk
@@ -60,10 +67,14 @@ public class QuerydslBasicTest {
         assertThat(findMember.getUsername()).isEqualTo("member1");
     }
 
+    /**
+     * [Lesson01.JPQL vs Querydsl 비교]
+     * Querydsl 사용예시
+     */
     @Test
     public void startQuerydsl() {
         /**
-         * [기본 Q-Type 활용]
+         * [기본 Q-Type 사용]
          * 별칭 직접 지정 방식 vs 기본 인스턴스 사용 방식
          * -> 기본 인스턴스 사용 방식(import static) 권장
          * [예시]
@@ -80,6 +91,10 @@ public class QuerydslBasicTest {
 
     }
 
+    /**
+     * [Lesson02.검색 조건 쿼리]
+     * where절에 필요한 조건을 넣고 조회하는 예시
+     */
     @Test
     public void search() {
         Member findMember = queryFactory
@@ -91,6 +106,10 @@ public class QuerydslBasicTest {
         assertThat(findMember.getUsername()).isEqualTo("member1");
     }
 
+    /**
+     * [Lesson02.검색 조건 쿼리]
+     * where절에 필요한 조건을 넣고 조회하는 예시
+     */
     @Test
     public void searchAndParam() {
         Member findMember = queryFactory
@@ -105,7 +124,7 @@ public class QuerydslBasicTest {
     }
 
     /**
-     * [결과 조회]
+     * [Lesson02.검색 조건 쿼리]
      * fetch(): 리스트 조회, 데이터 없으면 빈 리스트 반환
      * fetchOne() : 단 건 조회
      * fetchFirst() : limit(1).fetchOne()
@@ -140,6 +159,26 @@ public class QuerydslBasicTest {
     }
 
     /**
+     * [Lesson02.검색 조건 쿼리 - JPQL이 제공하는 모든 검색 조건 제공]
+     *
+     * member.username.eq("member1") // username = 'member1'
+     * member.username.ne("member1") //username != 'member1'
+     * member.username.eq("member1").not() // username != 'member1'
+     * member.username.isNotNull() //이름이 is not null
+     * member.age.in(10, 20) // age in (10,20)
+     * member.age.notIn(10, 20) // age not in (10, 20)
+     * member.age.between(10,30) //between 10, 30
+     * member.age.goe(30) // age >= 30
+     * member.age.gt(30) // age > 30
+     * member.age.loe(30) // age <= 30
+     * member.age.lt(30) // age < 30
+     * member.username.like("member%") //like 검색
+     * member.username.contains("member") // like ‘%member%’ 검색
+     * member.username.startsWith("member") //like ‘member%’ 검색
+     */
+
+    /**
+     * [Lesson03.정렬]
      * 회원 정렬 순서
      * 1. 회원 나이 내림차순(desc)
      * 2. 회원 이름 오름차순(asc)
@@ -168,7 +207,7 @@ public class QuerydslBasicTest {
     }
 
     /**
-     * [페이징]
+     * [Lesson04.페이징]
      * 조회 건수 제한
      */
     @Test
@@ -184,8 +223,8 @@ public class QuerydslBasicTest {
     }
 
     /**
-     * [페이징]
-     * 전체 조회수 필요
+     * [Lesson04.페이징]
+     * 전체 조회수 필요한 경우
      */
     @Test
     public void paging2() {
@@ -200,5 +239,65 @@ public class QuerydslBasicTest {
         assertThat(queryResults.getLimit()).isEqualTo(2);
         assertThat(queryResults.getOffset()).isEqualTo(1);
         assertThat(queryResults.getResults().size()).isEqualTo(2);
+    }
+
+    /**
+     * [Lesson05.집합]
+     * JPQL이 제공하는 모든 집합 함수를 제공한다.
+     * tuple은 프로젝션과 결과반환에서 설명한다
+     *
+     * JPQL
+     * select
+     * COUNT(m), //회원수
+     * SUM(m.age), //나이 합
+     * AVG(m.age), //평균 나이
+     * MAX(m.age), //최대 나이
+     * MIN(m.age) //최소 나이
+     * from Member m
+     */
+    @Test
+    public void aggregation() throws Exception {
+        List<Tuple> result = queryFactory
+                .select(member.count(),
+                        member.age.sum(),
+                        member.age.avg(),
+                        member.age.max(),
+                        member.age.min())
+                .from(member)
+                .fetch();
+
+        //실무에서는 Tuple대신 DTO에서 뽑아씀(추후 설명)
+        Tuple tuple = result.get(0);
+
+        //@BeforeEach 세팅 기반 비교
+        assertThat(tuple.get(member.count())).isEqualTo(4);
+        assertThat(tuple.get(member.age.sum())).isEqualTo(100);
+        assertThat(tuple.get(member.age.avg())).isEqualTo(25);
+        assertThat(tuple.get(member.age.max())).isEqualTo(40);
+        assertThat(tuple.get(member.age.min())).isEqualTo(10);
+    }
+
+    /**
+     * [Lesson05.집합 - GroupBy 사용]
+     * 팀의 이름과 각 팀의 평균 연령을 구해라.
+     */
+    @Test
+    public void group() throws Exception {
+        List<Tuple> result = queryFactory
+                .select(team.name, member.age.avg())
+                .from(member)
+                .join(member.team, team)
+                .groupBy(team.name) //팀 이름 기준 group
+                .fetch();
+
+        Tuple teamA = result.get(0);
+        Tuple teamB = result.get(1);
+
+        assertThat(teamA.get(team.name)).isEqualTo("teamA");
+        assertThat(teamA.get(member.age.avg())).isEqualTo(15);
+
+        assertThat(teamB.get(team.name)).isEqualTo("teamB");
+        assertThat(teamB.get(member.age.avg())).isEqualTo(35);
+
     }
 }
