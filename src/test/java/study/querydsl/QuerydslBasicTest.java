@@ -300,4 +300,95 @@ public class QuerydslBasicTest {
         assertThat(teamB.get(member.age.avg())).isEqualTo(35);
 
     }
+
+    /**
+     * [Lesson06.조인 - 기본 조인]
+     * 팀 A에 소속된 모든 회원을 찾아라
+     * join() , innerJoin() : 내부 조인(inner join)
+     * leftJoin() : left 외부 조인(left outer join)
+     * rightJoin() : rigth 외부 조인(rigth outer join)
+     */
+    @Test
+    public void join() throws Exception {
+        QMember member = QMember.member;
+        QTeam team = QTeam.team;
+
+        List<Member> result = queryFactory
+                .selectFrom(member)
+                .join(member.team, team)
+                .where(team.name.eq("teamA"))
+                .fetch();
+
+        assertThat(result)
+                .extracting("username")
+                .containsExactly("member1", "member2");
+    }
+
+    /**
+     * [Lesson06.조인 - 세타 조인]
+     * 연관관계가 없는 필드로 조인
+     * [예제] 회원의 이름이 팀 이름과 같은 회원을 조회하라.
+     */
+    @Test
+    public void theta_join() {
+        em.persist(new Member("teamA"));
+        em.persist(new Member("teamB"));
+        em.persist(new Member("teamC"));
+
+        List<Member> result = queryFactory
+                .select(member)
+                .from(member, team)
+                .where(member.username.eq(team.name))
+                .fetch();
+
+        assertThat(result)
+                .extracting("username")
+                .containsExactly("teamA", "teamB");
+    }
+
+    /**
+     * [Lesson06.조인 - on절] - 연관관계 존재하는 엔티티 조인
+     * [예제] 회원과 팀을 조인하면서, 팀 이름이 teamA인 팀만 조인, 회원은 모두 조회
+     * JPQL: SELECT m, t FROM Member m LEFT JOIN m.team t on t.name = 'teamA'
+     * SQL: SELECT m.*, t.* FROM Member m LEFT JOIN Team t ON m.TEAM_ID=t.id and t.name='teamA'
+     */
+    @Test
+    public void join_on_filtering() throws Exception {
+        List<Tuple> result = queryFactory
+                .select(member, team)
+                .from(member)
+                .leftJoin(member.team, team)
+//                외부조인이 필요할 때만 .on절을 사용하며, 가급적 where절로 해결하는 것이 좋다.
+//                내부조인을 사용하는 경우 .on절과 .where절 기능이 동일하기 때문이다
+//                .on(team.name.eq("teamA"))
+                .where(team.name.eq("teamA"))
+                .fetch();
+
+        for (Tuple tuple : result){
+            System.out.println("tuple = " + tuple);
+        }
+    }
+
+    /**
+     * [Lesson06.조인 - on절] - 연관관계 없는 엔티티 외부 조인
+     * [예제] 회원의 이름과 팀의 이름이 같은 대상 외부 조인
+     * JPQL: SELECT m, t FROM Member m LEFT JOIN Team t on m.username = t.name
+     * SQL: SELECT m.*, t.* FROM Member m LEFT JOIN Team t ON m.username = t.name
+     */
+    @Test
+    public void join_on_no_relation() throws Exception {
+        em.persist(new Member("teamA"));
+        em.persist(new Member("teamB"));
+
+        List<Tuple> result = queryFactory
+                .select(member, team)
+                .from(member)
+                .leftJoin(team) //연관관계 존재하는 매핑과 차이점
+                .on(team.name.eq(member.username))
+                .fetch();
+
+        for (Tuple tuple : result){
+            System.out.println("tuple = " + tuple);
+        }
+    }
 }
